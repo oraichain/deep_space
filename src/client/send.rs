@@ -79,9 +79,7 @@ impl Contact {
         msg: Vec<u8>,
         mode: BroadcastMode,
     ) -> Result<TxResponse, CosmosGrpcError> {
-        let mut txrpc = TxServiceClient::connect(self.get_url())
-            .await?
-            .accept_gzip();
+        let mut txrpc = TxServiceClient::connect(self.get_url()).await?;
         let response = txrpc
             .broadcast_tx(BroadcastTxRequest {
                 tx_bytes: msg,
@@ -241,9 +239,7 @@ impl Contact {
         private_key: impl PrivateKey,
     ) -> Result<SimulateResponse, CosmosGrpcError> {
         let our_address = private_key.to_address(&self.chain_prefix).unwrap();
-        let mut txrpc = TxServiceClient::connect(self.get_url())
-            .await?
-            .accept_gzip();
+        let mut txrpc = TxServiceClient::connect(self.get_url()).await?;
 
         let fee_obj = Fee {
             amount: vec![],
