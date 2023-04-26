@@ -14,6 +14,9 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 
+#[cfg(feature = "ethermint")]
+use clarity::address::Address as EthAddress;
+
 /// In cases where it's impossible to know the Bech32 prefix
 /// we fall back to this value
 pub const DEFAULT_PREFIX: &str = "cosmos";
