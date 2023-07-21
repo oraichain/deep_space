@@ -10,6 +10,8 @@ use std::fmt::{self, Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
 
+use base64::{engine::general_purpose, Engine as _};
+
 pub trait PublicKey {
     const DEFAULT_PREFIX: &'static str;
 
@@ -273,7 +275,7 @@ impl FromStr for CosmosPublicKey {
                 Err(PublicKeyError::HexDecodeErrorWrongLength)
             }
         } else {
-            match base64::decode(s) {
+            match general_purpose::STANDARD_NO_PAD.decode(s) {
                 Ok(bytes) => {
                     if bytes.len() == 33 {
                         let mut inner = [0; 33];
@@ -295,7 +297,7 @@ impl FromStr for CosmosPublicKey {
 impl Display for CosmosPublicKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let display = self.to_bech32(self.get_prefix()).unwrap();
-        write!(f, "{}", display).expect("Unable to write");
+        write!(f, "{display}").expect("Unable to write");
         Ok(())
     }
 }

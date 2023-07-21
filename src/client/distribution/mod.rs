@@ -2,7 +2,7 @@
 //! including the community pool
 
 use super::{ChainStatus, PAGE};
-use crate::client::msgs::{
+use crate::client::type_urls::{
     MSG_FUND_COMMUNITY_POOL_TYPE_URL, MSG_WITHDRAW_DELEGATOR_REWARD_TYPE_URL,
     MSG_WITHDRAW_VALIDATOR_COMMISSION_TYPE_URL,
 };
@@ -26,6 +26,7 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::{
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::{
     QueryDelegationTotalRewardsResponse, QueryDelegatorValidatorsRequest,
 };
+use num256::error::ParseError;
 use num256::Uint256;
 use std::time::Duration;
 
@@ -42,7 +43,7 @@ impl Contact {
         let val = res.into_inner().pool;
         let mut res = Vec::new();
         for v in val {
-            let parse_result: Result<Uint256, _> = v.amount.parse();
+            let parse_result: Result<Uint256, ParseError> = v.amount.parse();
             match parse_result {
                 Ok(parse_result) => res.push(Coin {
                     denom: v.denom,

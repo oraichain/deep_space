@@ -11,7 +11,7 @@ use cosmos_sdk_proto::cosmos::tx::v1beta1::Tx;
 use cosmos_sdk_proto::cosmos::tx::v1beta1::{
     mode_info, AuthInfo, ModeInfo, SignDoc, SignerInfo, TxBody, TxRaw,
 };
-use num_bigint::BigUint;
+use num256::Uint256;
 use prost::Message;
 use secp256k1::constants::CURVE_ORDER as CurveN;
 use secp256k1::Message as CurveMessage;
@@ -257,7 +257,7 @@ impl FromStr for CosmosPrivateKey {
 
 /// This structure represents a private key of an EVM Network.
 #[cfg(feature = "ethermint")]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct EthermintPrivateKey([u8; 32]);
 
 #[cfg(feature = "ethermint")]
@@ -432,6 +432,15 @@ impl FromStr for EthermintPrivateKey {
     }
 }
 
+#[cfg(feature = "ethermint")]
+use clarity::PrivateKey as EthPrivateKey;
+#[cfg(feature = "ethermint")]
+impl From<EthPrivateKey> for EthermintPrivateKey {
+    fn from(value: EthPrivateKey) -> Self {
+        EthermintPrivateKey(value.to_bytes())
+    }
+}
+
 /// Create a private key using an arbitrary slice of bytes. This function is not resistant to side
 /// channel attacks and may reveal your secret and private key. It is on the other hand more compact
 /// than the bip32+bip39 logic.
@@ -439,23 +448,17 @@ impl FromStr for EthermintPrivateKey {
 fn from_secret(secret: &[u8]) -> [u8; 32] {
     let sec_hash = Sha256::digest(secret);
 
-    let mut i = BigUint::from_bytes_be(&sec_hash);
+    let mut i = Uint256::from_be_bytes(&sec_hash);
 
     // Parameters of the curve as explained in https://en.bitcoin.it/wiki/Secp256k1
-    let mut n = BigUint::from_bytes_be(&CurveN);
-    n -= 1u64;
+    let mut n = Uint256::from_be_bytes(&CurveN);
+    n -= 1u64.into();
 
     i %= n;
-    i += 1u64;
+    i += 1u64.into();
 
     let mut result: [u8; 32] = Default::default();
-    let mut i_bytes = i.to_bytes_be();
-    // key has leading or trailing zero that's not displayed
-    // by default since this is a big int library missing a defined
-    // integer width.
-    while i_bytes.len() < 32 {
-        i_bytes.push(0);
-    }
+    let i_bytes = i.to_be_bytes();
     result.copy_from_slice(&i_bytes);
     result
 }
@@ -864,7 +867,7 @@ fn test_ethermint_signatures() {
     let clarity_sk = clarity::private_key::PrivateKey::from_bytes(sk.0).unwrap();
     let signature = clarity_sk.sign_insecure_msg(msg.as_bytes());
     let mut sigbytes = signature.to_bytes();
-    let v = signature.v;
+    let v = signature.get_v();
     sigbytes[64] = (v.to_u8().unwrap()) - 27u8; // Fix some weirdness in the clarity implementation
 
     assert_eq!(
@@ -969,9 +972,9 @@ fn test_bank_send_msg() {
         let uk = EthermintPrivateKey::from_phrase(user_mnemonic, "").unwrap();
 
         let output = contact.send_coins(Coin { amount: 100u8.into(), denom: "ugraviton".to_string() }, None, destination, Some(Duration::from_secs(30)), vk).await;
-        println!("output is {:?}", output);
+        println!("output is {output:?}");
 
         let output = contact.send_coins(Coin { amount: 100u8.into(), denom: "ugraviton".to_string() }, None, destination, Some(Duration::from_secs(30)), uk).await;
-        println!("output is {:?}", output)
+        println!("output is {output:?}")
     });
 }

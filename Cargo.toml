@@ -1,6 +1,6 @@
 [package]
 name = "deep_space"
-version = "2.15.2"
+version = "2.21.2"
 authors = ["Justin Kilpatrick <justin@althea.net>", "Michał Papierski <michal@papierski.net>"]
 repository = "https://github.com/althea-net/deep_space"
 description = "A highly portable, batteries included, transaction generation and key management library for CosmosSDK blockchains"
@@ -10,22 +10,21 @@ edition = "2021"
 [dependencies]
 num256 = "0.5"
 sha2 = "0.10"
-num-bigint = "0.4"
 num-traits = "0.2"
 ripemd = "0.1"
 bech32 = "0.9"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
-base64 = "0.13"
+base64 = "0.21"
 unicode-normalization = {version = "0.1"}
 prost-types = "0.11"
 prost = "0.11"
-pbkdf2 = {version = "0.11"}
+pbkdf2 = {version = "0.12"}
 hmac = {version = "0.12"}
 rand = {version = "0.8"}
 rust_decimal = "1.9"
-secp256k1 = {version = "0.24", features = ["global-context"]}
+secp256k1 = {version = "0.27", features = ["global-context"]}
 tonic = {version = "0.8", features = ["tls", "tls-roots"]}
 bytes = "1.0"
 log = "0.4"
@@ -37,7 +36,8 @@ cosmos-sdk-proto = {git = "https://github.com/oraichain/cosmos-rust", rev = "19f
 althea_proto = {version="0.1", optional=true}
 
 [dev-dependencies]
-env_logger = "0.9"
+rand = "0.8"
+env_logger = "0.10"
 actix-rt = "2.2"
 
 

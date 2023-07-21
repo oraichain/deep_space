@@ -1,5 +1,7 @@
 use crate::address::Address;
-use crate::client::msgs::MSG_SEND_TYPE_URL;
+#[cfg(feature = "althea")]
+use crate::client::type_urls::MSG_MICROTX_TYPE_URL;
+use crate::client::type_urls::MSG_SEND_TYPE_URL;
 use crate::client::Contact;
 use crate::client::MEMO;
 use crate::coin::Coin;
@@ -9,6 +11,8 @@ use crate::msg::Msg;
 use crate::private_key::PrivateKey;
 use crate::utils::check_for_sdk_error;
 use crate::MessageArgs;
+#[cfg(feature = "althea")]
+use althea_proto::microtx::v1::MsgMicrotx;
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::tx::v1beta1::BroadcastMode;
 use cosmos_sdk_proto::cosmos::tx::v1beta1::BroadcastTxRequest;
@@ -40,7 +44,7 @@ impl Contact {
     /// use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
     /// use cosmos_sdk_proto::cosmos::tx::v1beta1::BroadcastMode;
     /// use deep_space::{Coin, client::Contact, Fee, MessageArgs, Msg, CosmosPrivateKey, PrivateKey, PublicKey};
-    /// use deep_space::client::msgs::SECP256K1_PUBKEY_TYPE_URL;
+    /// use deep_space::client::type_urls::SECP256K1_PUBKEY_TYPE_URL;
     /// use std::time::Duration;
     /// let private_key = CosmosPrivateKey::from_secret("mySecret".as_bytes());
     /// let public_key = private_key.to_public_key("cosmospub").unwrap();
@@ -113,7 +117,7 @@ impl Contact {
     /// use cosmos_sdk_proto::cosmos::tx::v1beta1::BroadcastMode;
     /// use deep_space::{Coin, client::Contact, Fee, MessageArgs, Msg, CosmosPrivateKey, PrivateKey, PublicKey};
     /// use std::time::Duration;
-    /// use deep_space::client::msgs::SECP256K1_PUBKEY_TYPE_URL;
+    /// use deep_space::client::type_urls::SECP256K1_PUBKEY_TYPE_URL;
     /// let private_key = CosmosPrivateKey::from_secret("mySecret".as_bytes());
     /// let public_key = private_key.to_public_key("cosmospub").unwrap();
     /// let address = public_key.to_address();
@@ -144,7 +148,6 @@ impl Contact {
         let fee = self
             .get_fee_info(messages, fee_coin, private_key.clone())
             .await?;
-
         let args = self.get_message_args(our_address, fee).await?;
         trace!("got optional tx info");
 
@@ -188,7 +191,7 @@ impl Contact {
         private_key: impl PrivateKey,
     ) -> Result<Fee, CosmosGrpcError> {
         let gas_info = self
-            .simulate_tx(messages, private_key.clone())
+            .simulate_tx(messages, Some(fee_token), private_key.clone())
             .await?
             .gas_info
             .unwrap();
@@ -236,13 +239,15 @@ impl Contact {
     pub async fn simulate_tx(
         &self,
         messages: &[Msg],
+        fee_amount: Option<&[Coin]>,
         private_key: impl PrivateKey,
     ) -> Result<SimulateResponse, CosmosGrpcError> {
         let our_address = private_key.to_address(&self.chain_prefix).unwrap();
+        let fee_amount = fee_amount.unwrap_or_default();
         let mut txrpc = TxServiceClient::connect(self.get_url()).await?;
 
         let fee_obj = Fee {
-            amount: vec![],
+            amount: fee_amount.to_vec(),
             // derived from this constant https://github.com/cosmos/cosmos-sdk/blob/master/types/tx/types.go#L13
             gas_limit: 9223372036854775807,
             granter: None,
@@ -270,7 +275,7 @@ impl Contact {
     /// # Arguments
     ///
     /// * `coin` - The amount and type of coin you are sending
-    /// * `fee_coin` - A fee amount and coin type to use, pass an empty array to send a zero fee transaction
+    /// * `fee_coin` - A fee amount and coin type to use, pass None to send a zero fee transaction
     /// * `destination` - The target destination address
     /// * `wait_timeout` - An optional amount of time to wait for the transaction to enter the blockchain
     /// * `private_key` - A private key used to sign and send the transaction
@@ -285,11 +290,16 @@ impl Contact {
     /// let address = public_key.to_address();
     /// let coin = Coin {
     ///     denom: "validatortoken".to_string(),
+    ///     amount: 1000000u32.into(),
+    /// };
+    /// let fee = Coin {
+    ///     denom: "validatortoken".to_string(),
     ///     amount: 1u32.into(),
     /// };
     /// let contact = Contact::new("https:://your-grpc-server", Duration::from_secs(5), "prefix").unwrap();
+    /// let duration = Duration::from_secs(30);
     /// // future must be awaited in tokio runtime
-    /// contact.send_coins(coin.clone(), Some(coin), address, None, private_key);
+    /// contact.send_coins(coin.clone(), Some(fee), address, Some(duration), private_key);
     /// ```
     pub async fn send_coins(
         &self,
@@ -308,6 +318,66 @@ impl Contact {
             to_address: destination.to_bech32(&self.chain_prefix).unwrap(),
         };
         let msg = Msg::new(MSG_SEND_TYPE_URL, send);
+        self.send_message(
+            &[msg],
+            None,
+            &[fee_coin.unwrap_or_default()],
+            wait_timeout,
+            private_key,
+        )
+        .await
+    }
+
+    #[cfg(feature = "althea")]
+    /// A utility function that executes a microtransaction on the Althea Chain, meant to be used by routers
+    /// on Althea networks to pay peers for internet service.
+    ///
+    /// # Arguments
+    ///
+    /// * `coin` - The amount and type of coin you are sending
+    /// * `fee_coin` - A fee amount and coin type to use, pass None to send a zero fee transaction
+    /// * `destination` - The target destination address
+    /// * `wait_timeout` - An optional amount of time to wait for the transaction to enter the blockchain
+    /// * `private_key` - A private key used to sign and send the transaction
+    /// # Examples
+    /// ```rust
+    /// use althea_proto::microtx::v1::MsgMicrotx;
+    /// use cosmos_sdk_proto::cosmos::tx::v1beta1::BroadcastMode;
+    /// use deep_space::{Coin, client::Contact, Fee, MessageArgs, Msg, CosmosPrivateKey, PrivateKey, PublicKey};
+    /// use std::time::Duration;
+    /// let private_key = CosmosPrivateKey::from_secret("mySecret".as_bytes());
+    /// let public_key = private_key.to_public_key("cosmospub").unwrap();
+    /// let address = public_key.to_address();
+    /// let coin = Coin {
+    ///     denom: "validatortoken".to_string(),
+    ///     amount: 1000000u32.into(),
+    /// };
+    /// let fee = Coin {
+    ///     denom: "validatortoken".to_string(),
+    ///     amount: 10u32.into(),
+    /// };
+    /// let contact = Contact::new("https:://your-grpc-server", Duration::from_secs(5), "prefix").unwrap();
+    /// let duration = Duration::from_secs(30);
+    /// // future must be awaited in tokio runtime
+    /// contact.send_microtx(coin.clone(), Some(fee), address, Some(duration), private_key);
+    /// ```
+    pub async fn send_microtx(
+        &self,
+        coin: Coin,
+        fee_coin: Option<Coin>,
+        destination: Address,
+        wait_timeout: Option<Duration>,
+        private_key: impl PrivateKey,
+    ) -> Result<TxResponse, CosmosGrpcError> {
+        trace!("Creating transaction");
+        let our_address = private_key.to_address(&self.chain_prefix).unwrap();
+
+        let send = MsgMicrotx {
+            sender: our_address.to_bech32(&self.chain_prefix).unwrap(),
+            receiver: destination.to_bech32(&self.chain_prefix).unwrap(),
+            amount: Some(coin.into()),
+        };
+        let msg = Msg::new(MSG_MICROTX_TYPE_URL, send);
         self.send_message(
             &[msg],
             None,
@@ -355,5 +425,39 @@ impl Contact {
             time: timeout,
             sdk_error: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::CosmosPrivateKey;
+
+    use super::*;
+
+    const TIMEOUT: Duration = Duration::from_secs(60);
+
+    #[ignore]
+    #[actix_rt::test]
+    async fn test_send_to_althea() {
+        env_logger::init();
+        let contact = Contact::new("http://localhost:9090", TIMEOUT, "althea").unwrap();
+        let mnemonic = "prepare meadow assault rifle biology animal visit eight purchase dinosaur question question inside sister ignore any airport tell ecology extend dove wrist mean comfort";
+        let private_key: CosmosPrivateKey = PrivateKey::from_phrase(mnemonic, "").unwrap();
+        let coin = Coin {
+            denom: "aalthea".to_string(),
+            amount: 100u32.into(),
+        };
+        let destination =
+            Address::from_bech32("althea1nldz7ns4hn4waar3e90mafdyucqts5xzemg28d".to_string())
+                .unwrap();
+        let fee = Coin {
+            denom: "aalthea".to_string(),
+            amount: 100u32.into(),
+        };
+
+        let res = contact
+            .send_coins(coin, Some(fee), destination, Some(TIMEOUT), private_key)
+            .await;
+        assert!(res.is_ok())
     }
 }

@@ -1,11 +1,12 @@
 #![warn(clippy::all)]
 #![allow(clippy::pedantic)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::result_large_err)]
 #![forbid(unsafe_code)]
 
 extern crate base64;
 extern crate bech32;
 extern crate num256;
-extern crate num_bigint;
 extern crate num_traits;
 extern crate ripemd;
 extern crate serde;

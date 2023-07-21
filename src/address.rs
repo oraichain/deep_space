@@ -102,8 +102,7 @@ impl Address {
     pub fn from_bech32(s: String) -> Result<Self, AddressError> {
         let (hrp, data, _) = match bech32::decode(&s) {
             Ok(val) => val,
-            Err(e) => {
-                println!("{:?}", e);
+            Err(_) => {
                 return Err(AddressError::Bech32InvalidEncoding);
             }
         };
@@ -187,7 +186,7 @@ impl FromStr for Address {
 impl Display for Address {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let display = self.to_bech32(self.get_prefix()).unwrap();
-        write!(f, "{}", display).expect("Unable to write");
+        write!(f, "{display}").expect("Unable to write");
         Ok(())
     }
 }
