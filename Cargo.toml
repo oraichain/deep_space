@@ -1,7 +1,10 @@
 [package]
 name = "deep_space"
-version = "2.21.2"
-authors = ["Justin Kilpatrick <justin@althea.net>", "Michał Papierski <michal@papierski.net>"]
+version = "2.23.0"
+authors = [
+    "Justin Kilpatrick <justin@althea.net>",
+    "Michał Papierski <michal@papierski.net>",
+]
 repository = "https://github.com/althea-net/deep_space"
 description = "A highly portable, batteries included, transaction generation and key management library for CosmosSDK blockchains"
 license = "Apache-2.0"
@@ -17,23 +20,23 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 base64 = "0.21"
-unicode-normalization = {version = "0.1"}
-prost-types = "0.11"
-prost = "0.11"
-pbkdf2 = {version = "0.12"}
-hmac = {version = "0.12"}
-rand = {version = "0.8"}
+unicode-normalization = { version = "0.1" }
+prost-types = "0.12"
+prost = "0.12"
+pbkdf2 = { version = "0.12" }
+hmac = { version = "0.12" }
+rand = { version = "0.8" }
 rust_decimal = "1.9"
-secp256k1 = {version = "0.27", features = ["global-context"]}
-tonic = {version = "0.8", features = ["tls", "tls-roots"]}
+secp256k1 = { version = "0.27", features = ["global-context"] }
+tonic = { version = "0.10", features = ["gzip"] }
 bytes = "1.0"
 log = "0.4"
-tokio = {version = "1.4", features=["time"]}
-clarity = {version = "1.2.3", optional = true}
-sha3 = {version = "0.10", optional = true}
+tokio = { version = "1.4", features = ["time"] }
+clarity = { version = "1.2.3", optional = true }
+sha3 = { version = "0.10", optional = true }
 
-cosmos-sdk-proto = {git = "https://github.com/oraichain/cosmos-rust", rev = "19f3de7", package = "cosmos-sdk-proto-althea"}
-althea_proto = {version="0.1", optional=true}
+cosmos-sdk-proto = { package = "cosmos-sdk-proto-althea", version = "0.16" }
+althea_proto = { version = "0.3", optional = true }
 
 [dev-dependencies]
 rand = "0.8"
@@ -42,5 +45,7 @@ actix-rt = "2.2"
 
 
 [features]
+default = ["ssl"]
 ethermint = ["clarity", "sha3"]
 althea = ["ethermint", "dep:althea_proto"]
+ssl = ["tonic/tls", "tonic/tls-roots"]
